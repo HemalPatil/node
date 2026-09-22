@@ -54,7 +54,7 @@
 #define NODE_TAG ""
 #endif  // NODE_ALPHA_MAJOR_VERSION
 #else   // NODE_VERSION_IS_RELEASE
-#define NODE_TAG "-pre"
+#define NODE_TAG "-experimental-test-mcdc-coverage"
 #endif  // NODE_VERSION_IS_RELEASE
 #else   // NODE_TAG
 // NODE_TAG is passed without quotes when rc.exe is run from msbuild
