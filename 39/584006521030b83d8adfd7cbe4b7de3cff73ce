@@ -1,0 +1,45 @@
+test/mcdc/proof.mts
+  s_f16649ced22385::t_3d00aee0f7cdcb 1-4,6,10,13-14,16
+  h_65f637d8e707b9 5,7-9,11-12,15
+test/mcdc/.editorconfig
+  h_65f637d8e707b9 1-11
+test/mcdc/tsconfig.json
+  h_65f637d8e707b9 1-19
+test/mcdc/.gitignore
+  h_65f637d8e707b9 1-2
+test/mcdc/package.json
+  h_65f637d8e707b9 6-8,10
+  h_30002cb5f759dc 1-5,9,11-15
+test/mcdc/proof.test.mts
+  h_65f637d8e707b9 4,7-8,11-12,16,18
+  s_f16649ced22385::t_3d00aee0f7cdcb 1-3,5-6,9-10,13-15,17,22
+  s_f16649ced22385::t_b4c18376977727 19-21
+test/mcdc/coverage-listener.mts
+  h_30002cb5f759dc 1-7
+test/mcdc/package-lock.json
+  h_30002cb5f759dc 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "39584006521030b83d8adfd7cbe4b7de3cff73ce",
+  "prompts": {},
+  "humans": {
+    "h_30002cb5f759dc": {
+      "author": "Hemal Patil <hempat02@gmail.com>"
+    },
+    "h_65f637d8e707b9": {
+      "author": "Hemal Patil <hemal.patil@jiostar.com>"
+    }
+  },
+  "sessions": {
+    "s_f16649ced22385": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cadc-b4d7-7af2-a241-a0da53acce9a",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Hemal Patil <hempat02@gmail.com>"
+    }
+  }
+}
