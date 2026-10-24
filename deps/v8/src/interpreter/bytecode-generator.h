@@ -648,6 +648,7 @@ class BytecodeGenerator final : public AstVisitor<BytecodeGenerator> {
   // External vector of literals to be eagerly compiled.
   std::vector<FunctionLiteral*>* eager_inner_literals_;
   Handle<Script> script_;
+  bool is_proof_script_;
 
   FeedbackSlotCache* feedback_slot_cache_;
 

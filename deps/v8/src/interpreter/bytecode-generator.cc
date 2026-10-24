@@ -6,6 +6,8 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -1471,11 +1473,20 @@ BytecodeGenerator::BytecodeGenerator(
       hole_check_bitmap_(0),
       current_loop_scope_(nullptr),
       current_for_in_scope_(nullptr),
-      catch_prediction_(HandlerTable::UNCAUGHT) {
+      catch_prediction_(HandlerTable::UNCAUGHT),
+      is_proof_script_(false) {
   DCHECK_EQ(closure_scope(), closure_scope()->GetClosureScope());
   if (info->has_source_range_map()) {
     block_coverage_builder_ = zone()->New<BlockCoverageBuilder>(
         zone(), builder(), info->source_range_map());
+  }
+  Tagged<Object> name_or_source_url = script_->GetNameOrSourceURL();
+  if (IsString(name_or_source_url)) {
+    std::unique_ptr<char[]> name_or_source_url_cstr =
+        Cast<String>(name_or_source_url)->ToCString();
+    if (std::strstr(name_or_source_url_cstr.get(), "test/mcdc/proof.mts") != nullptr) {
+      this->is_proof_script_ = true;
+    }
   }
 }
 
@@ -8389,6 +8400,13 @@ void BytecodeGenerator::VisitLogicalTestSubExpression(
 void BytecodeGenerator::VisitLogicalTest(Token::Value token, Expression* left,
                                          Expression* right,
                                          int right_coverage_slot) {
+  if (this->is_proof_script_) {
+    std::cout
+        << "[DEBUG] mcdc: "
+            "v8::internal::interpreter::BytecodeGenerator::"
+            "VisitLogicalTest - proof.mts"
+        << std::endl;
+  }
   DCHECK(token == Token::kOr || token == Token::kAnd ||
          token == Token::kNullish);
   TestResultScope* test_result = execution_result()->AsTest();
@@ -8489,14 +8507,37 @@ void BytecodeGenerator::VisitLogicalOrExpression(BinaryOperation* binop) {
   Expression* left = binop->left();
   Expression* right = binop->right();
 
+  Tagged<Object> name_or_source_url = script_->GetNameOrSourceURL();
+  if (this->is_proof_script_) {
+    std::cout
+        << "[DEBUG] mcdc: "
+            "v8::internal::interpreter::BytecodeGenerator::"
+            "VisitLogicalOrExpression - proof.mts"
+        << std::endl;
+  }
+
   int right_coverage_slot =
       AllocateBlockCoverageSlotIfEnabled(binop, SourceRangeKind::kRight);
 
   if (execution_result()->IsTest()) {
     TestResultScope* test_result = execution_result()->AsTest();
     if (left->ToBooleanIsTrue()) {
+      if (this->is_proof_script_) {
+        std::cout
+            << "[DEBUG] mcdc: "
+                "v8::internal::interpreter::BytecodeGenerator::"
+                "VisitLogicalOrExpression - proof.mts left->ToBooleanIsTrue()"
+            << std::endl;
+      }
       builder()->Jump(test_result->NewThenLabel());
     } else if (left->ToBooleanIsFalse() && right->ToBooleanIsFalse()) {
+      if (this->is_proof_script_) {
+        std::cout
+            << "[DEBUG] mcdc: "
+                "v8::internal::interpreter::BytecodeGenerator::"
+                "VisitLogicalOrExpression - proof.mts left->ToBooleanIsTrue() && right->ToBooleanIsFalse()"
+            << std::endl;
+      }
       BuildIncrementBlockCoverageCounterIfEnabled(right_coverage_slot);
       builder()->Jump(test_result->NewElseLabel());
     } else {
