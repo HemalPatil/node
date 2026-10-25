@@ -282,6 +282,10 @@ class V8_EXPORT_PRIVATE Debug {
       Tagged<SharedFunctionInfo> sfi);
   bool HasDebugInfo(Tagged<SharedFunctionInfo> sfi);
   bool HasCoverageInfo(Tagged<SharedFunctionInfo> sfi);
+  bool HasLogicalOrCoverageInfo(Tagged<SharedFunctionInfo> sfi);
+  void InstallLogicalOrCoverageInfo(DirectHandle<SharedFunctionInfo> shared,
+                                    DirectHandle<ByteArray> logical_or_info);
+  void RemoveAllLogicalOrCoverageInfos();
   bool HasBreakInfo(Tagged<SharedFunctionInfo> sfi);
   bool BreakAtEntry(Tagged<SharedFunctionInfo> sfi);
 

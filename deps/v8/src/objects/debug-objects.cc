@@ -9,6 +9,7 @@
 #include "src/handles/handles-inl.h"
 #include "src/objects/call-site-info-inl.h"
 #include "src/objects/debug-objects-inl.h"
+#include "src/objects/fixed-primitive-array-inl.h"
 #include "src/utils/ostreams.h"
 
 namespace v8 {
@@ -231,6 +232,19 @@ void DebugInfo::ClearCoverageInfo(Isolate* isolate) {
   }
 }
 
+bool DebugInfo::HasLogicalOrCoverageInfo() const {
+  return flags(kRelaxedLoad).contains(kHasLogicalOrCoverageInfo);
+}
+
+void DebugInfo::ClearLogicalOrCoverageInfo(Isolate* isolate) {
+  if (HasLogicalOrCoverageInfo()) {
+    set_logical_or_coverage_info(ReadOnlyRoots(isolate).undefined_value());
+    Flags new_flags =
+        flags(kRelaxedLoad).without(kHasLogicalOrCoverageInfo);
+    set_flags(new_flags, kRelaxedStore);
+  }
+}
+
 DebugInfo::SideEffectState DebugInfo::GetSideEffectState(Isolate* isolate) {
   if (side_effect_state() == kNotComputed) {
     SideEffectState has_no_side_effect =
@@ -392,6 +406,114 @@ void CoverageInfo::InitializeSlot(int slot_index, int from_pos, int to_pos) {
 
 void CoverageInfo::ResetBlockCount(int slot_index) {
   set_slots_block_count(slot_index, 0);
+}
+
+namespace {
+
+constexpr int kLogicalOrDecisionCountOffset = 0;
+constexpr int kLogicalOrRecordsOffset = sizeof(int32_t);
+constexpr int kLogicalOrRecordSize = sizeof(LogicalOrEvaluationPattern);
+
+int LogicalOrPatternOffset(int pattern_index) {
+  return kLogicalOrRecordsOffset + pattern_index * kLogicalOrRecordSize;
+}
+
+}  // namespace
+
+uint32_t LogicalOrCoverageInfo::SizeFor(int decision_count) {
+  CHECK_GE(decision_count, 0);
+  constexpr uint32_t kHeaderSize = sizeof(int32_t);
+  constexpr uint32_t kDecisionSize =
+      kPatternsPerDecision * sizeof(LogicalOrEvaluationPattern);
+  CHECK_LE(static_cast<uint32_t>(decision_count),
+           (ByteArray::kMaxLength - kHeaderSize) / kDecisionSize);
+  return kHeaderSize + static_cast<uint32_t>(decision_count) * kDecisionSize;
+}
+
+int LogicalOrCoverageInfo::decision_count(Tagged<ByteArray> info) {
+  return static_cast<int32_t>(info->get_int(kLogicalOrDecisionCountOffset));
+}
+
+LogicalOrEvaluationPattern LogicalOrCoverageInfo::GetPattern(
+    Tagged<ByteArray> info, int pattern_index) {
+  DCHECK_GE(pattern_index, 0);
+  DCHECK_LT(pattern_index, decision_count(info) * kPatternsPerDecision);
+  const int offset = LogicalOrPatternOffset(pattern_index);
+  LogicalOrEvaluationPattern pattern;
+  pattern.decision_start_source_position =
+      static_cast<int32_t>(info->get_int(offset));
+  pattern.decision_end_source_position =
+      static_cast<int32_t>(info->get_int(offset + 4));
+  pattern.left_start_source_position =
+      static_cast<int32_t>(info->get_int(offset + 8));
+  pattern.left_end_source_position =
+      static_cast<int32_t>(info->get_int(offset + 12));
+  pattern.right_start_source_position =
+      static_cast<int32_t>(info->get_int(offset + 16));
+  pattern.right_end_source_position =
+      static_cast<int32_t>(info->get_int(offset + 20));
+  pattern.evaluated_condition_mask =
+      static_cast<int32_t>(info->get_int(offset + 24));
+  pattern.condition_values =
+      static_cast<int32_t>(info->get_int(offset + 28));
+  pattern.decision_value =
+      static_cast<int32_t>(info->get_int(offset + 32));
+  pattern.execution_count = info->get_int(offset + 36);
+  return pattern;
+}
+
+void LogicalOrCoverageInfo::InitializeDecision(
+    Tagged<ByteArray> info, int decision_index, int decision_start,
+    int decision_end, int left_start, int left_end, int right_start,
+    int right_end) {
+  DCHECK_GE(decision_index, 0);
+  DCHECK_LT(decision_index, decision_count(info));
+  constexpr int kLeftEvaluated = 1 << 0;
+  constexpr int kRightEvaluated = 1 << 1;
+  struct PatternValues {
+    int32_t evaluated_mask;
+    int32_t condition_values;
+    int32_t decision_value;
+  };
+  constexpr PatternValues kPatterns[] = {
+      {kLeftEvaluated, kLeftEvaluated, 1},
+      {kLeftEvaluated | kRightEvaluated, 0, 0},
+      {kLeftEvaluated | kRightEvaluated, kRightEvaluated, 1},
+  };
+
+  const int first_pattern = decision_index * kPatternsPerDecision;
+  for (int i = 0; i < kPatternsPerDecision; ++i) {
+    const int offset = LogicalOrPatternOffset(first_pattern + i);
+    const int32_t fields[] = {decision_start,
+                              decision_end,
+                              left_start,
+                              left_end,
+                              right_start,
+                              right_end,
+                              kPatterns[i].evaluated_mask,
+                              kPatterns[i].condition_values,
+                              kPatterns[i].decision_value,
+                              0};
+    for (int field = 0; field < 10; ++field) {
+      info->set_int(offset + field * sizeof(int32_t),
+                    static_cast<uint32_t>(fields[field]));
+    }
+  }
+}
+
+void LogicalOrCoverageInfo::IncrementExecutionCount(Tagged<ByteArray> info,
+                                                     int pattern_index) {
+  DCHECK_GE(pattern_index, 0);
+  DCHECK_LT(pattern_index, decision_count(info) * kPatternsPerDecision);
+  const int count_offset = LogicalOrPatternOffset(pattern_index) + 36;
+  info->set_int(count_offset, info->get_int(count_offset) + 1);
+}
+
+void LogicalOrCoverageInfo::ResetExecutionCounts(Tagged<ByteArray> info) {
+  const int pattern_count = decision_count(info) * kPatternsPerDecision;
+  for (int i = 0; i < pattern_count; ++i) {
+    info->set_int(LogicalOrPatternOffset(i) + 36, 0);
+  }
 }
 
 void CoverageInfo::CoverageInfoPrint(std::ostream& os,

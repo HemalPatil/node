@@ -29,6 +29,7 @@ class StackFrameInfo;
 class StackTraceInfo;
 class DebugScriptScopeInfo;
 class BytecodeArray;
+class ByteArray;
 class StructBodyDescriptor;
 
 // The DebugInfo class holds additional information for a function being
@@ -39,7 +40,8 @@ V8_OBJECT class DebugInfo : public ExposedTrustedObject {
   using HasBreakInfoBit = base::BitField<bool, 0, 1, uint32_t>;
   using PreparedForDebugExecutionBit = HasBreakInfoBit::Next<bool, 1>;
   using HasCoverageInfoBit = PreparedForDebugExecutionBit::Next<bool, 1>;
-  using BreakAtEntryBit = HasCoverageInfoBit::Next<bool, 1>;
+  using HasLogicalOrCoverageInfoBit = HasCoverageInfoBit::Next<bool, 1>;
+  using BreakAtEntryBit = HasLogicalOrCoverageInfoBit::Next<bool, 1>;
   using CanBreakAtEntryBit = BreakAtEntryBit::Next<bool, 1>;
   using DebugExecutionModeBit = CanBreakAtEntryBit::Next<bool, 1>;
   enum Flag : uint32_t {
@@ -47,12 +49,13 @@ V8_OBJECT class DebugInfo : public ExposedTrustedObject {
     kHasBreakInfo = HasBreakInfoBit::kMask,
     kPreparedForDebugExecution = PreparedForDebugExecutionBit::kMask,
     kHasCoverageInfo = HasCoverageInfoBit::kMask,
+    kHasLogicalOrCoverageInfo = HasLogicalOrCoverageInfoBit::kMask,
     kBreakAtEntry = BreakAtEntryBit::kMask,
     kCanBreakAtEntry = CanBreakAtEntryBit::kMask,
     kDebugExecutionMode = DebugExecutionModeBit::kMask,
   };
   using Flags = base::Flags<Flag>;
-  static constexpr int kFlagCount = 6;
+  static constexpr int kFlagCount = 7;
 
   // DebugInfo can be detached from the SharedFunctionInfo iff it is empty.
   bool IsEmpty() const;
@@ -169,6 +172,9 @@ V8_OBJECT class DebugInfo : public ExposedTrustedObject {
   // Clears all fields related to block coverage.
   void ClearCoverageInfo(Isolate* isolate);
 
+  bool HasLogicalOrCoverageInfo() const;
+  void ClearLogicalOrCoverageInfo(Isolate* isolate);
+
   static const int kEstimatedNofBreakPointsInFunction = 4;
 
   DECL_PRINTER(DebugInfo)
@@ -193,6 +199,11 @@ V8_OBJECT class DebugInfo : public ExposedTrustedObject {
   inline Tagged<UnionOf<CoverageInfo, Undefined>> coverage_info() const;
   inline void set_coverage_info(Tagged<UnionOf<CoverageInfo, Undefined>> value,
                                 WriteBarrierMode mode = UPDATE_WRITE_BARRIER);
+  inline Tagged<UnionOf<ByteArray, Undefined>> logical_or_coverage_info()
+      const;
+  inline void set_logical_or_coverage_info(
+      Tagged<UnionOf<ByteArray, Undefined>> value,
+      WriteBarrierMode mode = UPDATE_WRITE_BARRIER);
 
  private:
   // Get the break point info object for a source position.
@@ -204,9 +215,47 @@ V8_OBJECT class DebugInfo : public ExposedTrustedObject {
   TaggedMember<FixedArray> break_points_;
   TaggedMember<Smi> flags_;
   TaggedMember<UnionOf<CoverageInfo, Undefined>> coverage_info_;
+  TaggedMember<UnionOf<ByteArray, Undefined>> logical_or_coverage_info_;
   ProtectedTaggedMember<UnionOf<BytecodeArray, Zero>> original_bytecode_array_;
   ProtectedTaggedMember<UnionOf<BytecodeArray, Zero>> debug_bytecode_array_;
 } V8_OBJECT_END;
+
+// A ByteArray-backed collection of logical evaluation-pattern records for
+// binary logical OR decisions. Each decision has three records, corresponding
+// to the rows (true, not evaluated, true), (false, false, false), and
+// (false, true, true). The condition bits use bit 0 for the left condition and
+// bit 1 for the right condition; an unset bit in evaluated_condition_mask
+// means that condition was skipped.
+struct LogicalOrEvaluationPattern {
+  int32_t decision_start_source_position;
+  int32_t decision_end_source_position;
+  int32_t left_start_source_position;
+  int32_t left_end_source_position;
+  int32_t right_start_source_position;
+  int32_t right_end_source_position;
+  int32_t evaluated_condition_mask;
+  int32_t condition_values;
+  int32_t decision_value;
+  uint32_t execution_count;
+};
+static_assert(sizeof(LogicalOrEvaluationPattern) == 40);
+
+class LogicalOrCoverageInfo final {
+ public:
+  static constexpr int kPatternsPerDecision = 3;
+
+  static uint32_t SizeFor(int decision_count);
+  static int decision_count(Tagged<ByteArray> info);
+  static LogicalOrEvaluationPattern GetPattern(Tagged<ByteArray> info,
+                                              int pattern_index);
+  static void InitializeDecision(Tagged<ByteArray> info, int decision_index,
+                                int decision_start, int decision_end,
+                                int left_start, int left_end, int right_start,
+                                int right_end);
+  static void IncrementExecutionCount(Tagged<ByteArray> info,
+                                      int pattern_index);
+  static void ResetExecutionCounts(Tagged<ByteArray> info);
+};
 
 // The BreakPointInfo class holds information for break points set in a
 // function. The DebugInfo object holds a BreakPointInfo object for each code

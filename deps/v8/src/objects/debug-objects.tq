@@ -21,6 +21,7 @@ bitfield struct DebugInfoFlags extends uint31 {
   has_break_info: bool: 1 bit;
   prepared_for_debug_execution: bool: 1 bit;
   has_coverage_info: bool: 1 bit;
+  has_logical_or_coverage_info: bool: 1 bit;
   break_at_entry: bool: 1 bit;
   can_break_at_entry: bool: 1 bit;
   debug_execution_mode: bool: 1 bit;
@@ -44,6 +45,7 @@ extern class DebugInfo extends ExposedTrustedObject {
   // A bitfield that lists uses of the current instance.
   @cppRelaxedLoad @cppRelaxedStore flags: SmiTagged<DebugInfoFlags>;
   coverage_info: CoverageInfo|Undefined;
+  logical_or_coverage_info: ByteArray|Undefined;
   // The original uninstrumented bytecode array for functions with break
   // points - the instrumented bytecode is held in the shared function info.
   // Can contain Smi::zero() if cleared.

@@ -84,6 +84,15 @@ void DebugInfo::set_coverage_info(
   coverage_info_.store(this, value, mode);
 }
 
+Tagged<UnionOf<ByteArray, Undefined>> DebugInfo::logical_or_coverage_info()
+    const {
+  return logical_or_coverage_info_.load();
+}
+void DebugInfo::set_logical_or_coverage_info(
+    Tagged<UnionOf<ByteArray, Undefined>> value, WriteBarrierMode mode) {
+  logical_or_coverage_info_.store(this, value, mode);
+}
+
 Tagged<BytecodeArray> DebugInfo::original_bytecode_array() const {
   DCHECK(has_original_bytecode_array());
   return TrustedCast<BytecodeArray>(original_bytecode_array_.load());

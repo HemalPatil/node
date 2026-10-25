@@ -27,6 +27,7 @@ namespace v8 {
 namespace internal {
 
 class ArrayBoilerplateDescription;
+class ByteArray;
 class BytecodeArray;
 class ClassPositions;
 class CoverageInfo;
@@ -298,6 +299,7 @@ class FactoryBase {
       AllocationType allocation = AllocationType::kOld);
 
   Handle<CoverageInfo> NewCoverageInfo(const ZoneVector<SourceRange>& slots);
+  Handle<ByteArray> NewLogicalOrCoverageInfo(int decision_count);
 
   Handle<InternalizedString> InternalizeString(
       base::Vector<const uint8_t> string, bool convert_encoding = false);

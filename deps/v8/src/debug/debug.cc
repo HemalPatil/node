@@ -2424,6 +2424,27 @@ void Debug::RemoveAllCoverageInfos() {
   });
 }
 
+void Debug::InstallLogicalOrCoverageInfo(
+    DirectHandle<SharedFunctionInfo> shared,
+    DirectHandle<ByteArray> logical_or_info) {
+  RCS_SCOPE(isolate_, RuntimeCallCounterId::kDebugger);
+  DCHECK(!logical_or_info.is_null());
+
+  DirectHandle<DebugInfo> debug_info = GetOrCreateDebugInfo(shared);
+  DCHECK(!debug_info->HasLogicalOrCoverageInfo());
+
+  debug_info->set_flags(
+      debug_info->flags(kRelaxedLoad) | DebugInfo::kHasLogicalOrCoverageInfo,
+      kRelaxedStore);
+  debug_info->set_logical_or_coverage_info(*logical_or_info);
+}
+
+void Debug::RemoveAllLogicalOrCoverageInfos() {
+  ClearAllDebugInfos([=, this](DirectHandle<DebugInfo> info) {
+    info->ClearLogicalOrCoverageInfo(isolate_);
+  });
+}
+
 void Debug::ClearAllDebuggerHints() {
   ClearAllDebugInfos(
       [=](DirectHandle<DebugInfo> info) { info->set_debugger_hints(0); });
@@ -2505,6 +2526,12 @@ bool Debug::HasCoverageInfo(Tagged<SharedFunctionInfo> sfi) {
     return debug_info.value()->HasCoverageInfo();
   }
   return false;
+}
+
+bool Debug::HasLogicalOrCoverageInfo(Tagged<SharedFunctionInfo> sfi) {
+  std::optional<Tagged<DebugInfo>> debug_info = TryGetDebugInfo(sfi);
+  return debug_info.has_value() &&
+         debug_info.value()->HasLogicalOrCoverageInfo();
 }
 
 bool Debug::HasBreakInfo(Tagged<SharedFunctionInfo> sfi) {

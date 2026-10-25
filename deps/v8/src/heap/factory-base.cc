@@ -20,6 +20,8 @@
 #include "src/heap/read-only-heap.h"
 #include "src/logging/log.h"
 #include "src/objects/arguments-inl.h"
+#include "src/objects/debug-objects.h"
+#include "src/objects/fixed-primitive-array-inl.h"
 #include "src/objects/instance-type.h"
 #include "src/objects/js-regexp-inl.h"
 #include "src/objects/literal-objects-inl.h"
@@ -766,6 +768,20 @@ Handle<CoverageInfo> FactoryBase<Impl>::NewCoverageInfo(
     info->InitializeSlot(i, range.start, range.end);
   }
   return handle(info, isolate());
+}
+
+template <typename Impl>
+Handle<ByteArray> FactoryBase<Impl>::NewLogicalOrCoverageInfo(
+    int decision_count) {
+  CHECK_GE(decision_count, 0);
+  const uint32_t size = LogicalOrCoverageInfo::SizeFor(decision_count);
+  Handle<ByteArray> info = NewByteArray(size, AllocationType::kOld);
+  info->set_int(0, static_cast<uint32_t>(decision_count));
+  for (uint32_t offset = sizeof(int32_t); offset < size;
+       offset += sizeof(int32_t)) {
+    info->set_int(offset, 0);
+  }
+  return info;
 }
 
 template <typename Impl>
