@@ -185,7 +185,8 @@ constexpr bool CanTriggerGC(T... properties) {
   F(ScheduleBreak, 0, 1)                        \
   F(ScriptLocationFromLine2, 4, 1)              \
   F(SetGeneratorScopeVariableValue, 4, 1)       \
-  I(IncBlockCounter, 2, 1)
+  I(IncBlockCounter, 2, 1)                      \
+  F(IncLogicalOrCounter, 2, 1)
 
 #define FOR_EACH_INTRINSIC_FORIN(F, I) \
   F(ForInEnumerate, 1, 1)              \

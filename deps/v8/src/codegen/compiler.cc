@@ -768,8 +768,19 @@ CompilationJob::Status FinalizeSingleUnoptimizedCompilationJob(
       }
     }
 
+    MaybeHandle<ByteArray> logical_or_coverage_info;
+    if (compilation_info->has_logical_or_coverage_info()) {
+      MutexGuardIfOffThread<IsolateT> mutex_guard(
+          isolate->shared_function_info_access(), isolate);
+      if (!isolate->GetMainThreadIsolateUnsafe()->debug()->
+              HasLogicalOrCoverageInfo(*shared_info)) {
+        logical_or_coverage_info = compilation_info->logical_or_coverage_info();
+      }
+    }
+
     finalize_unoptimized_compilation_data_list->emplace_back(
-        isolate, shared_info, coverage_info, job->time_taken_to_execute(),
+        isolate, shared_info, coverage_info, logical_or_coverage_info,
+        job->time_taken_to_execute(),
         job->time_taken_to_finalize());
   }
   DCHECK_IMPLIES(status == CompilationJob::RETRY_ON_MAIN_THREAD,
@@ -1472,6 +1483,12 @@ void FinalizeUnoptimizedCompilation(
     if (finalize_data.coverage_info().ToHandle(&coverage_info)) {
       isolate->debug()->InstallCoverageInfo(shared_info, coverage_info);
     }
+    DirectHandle<ByteArray> logical_or_coverage_info;
+    if (finalize_data.logical_or_coverage_info().ToHandle(
+            &logical_or_coverage_info)) {
+      isolate->debug()->InstallLogicalOrCoverageInfo(shared_info,
+                                                     logical_or_coverage_info);
+    }
 
     LogUnoptimizedCompilation(isolate, shared_info, log_tag,
                               finalize_data.time_taken_to_execute(),
@@ -1640,12 +1657,15 @@ CompilationHandleScope::~CompilationHandleScope() {
 FinalizeUnoptimizedCompilationData::FinalizeUnoptimizedCompilationData(
     LocalIsolate* isolate, Handle<SharedFunctionInfo> function_handle,
     MaybeHandle<CoverageInfo> coverage_info,
+    MaybeHandle<ByteArray> logical_or_coverage_info,
     base::TimeDelta time_taken_to_execute,
     base::TimeDelta time_taken_to_finalize)
     : time_taken_to_execute_(time_taken_to_execute),
       time_taken_to_finalize_(time_taken_to_finalize),
       function_handle_(isolate->heap()->NewPersistentHandle(function_handle)),
-      coverage_info_(isolate->heap()->NewPersistentMaybeHandle(coverage_info)) {
+      coverage_info_(isolate->heap()->NewPersistentMaybeHandle(coverage_info)),
+      logical_or_coverage_info_(
+          isolate->heap()->NewPersistentMaybeHandle(logical_or_coverage_info)) {
 }
 
 DeferredFinalizationJobData::DeferredFinalizationJobData(

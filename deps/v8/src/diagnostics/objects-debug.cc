@@ -3710,6 +3710,7 @@ void DebugInfo::DebugInfoVerify(Isolate* isolate) {
   Object::VerifyPointer(isolate, shared());
   Object::VerifyPointer(isolate, break_points());
   Object::VerifyPointer(isolate, coverage_info());
+  Object::VerifyPointer(isolate, logical_or_coverage_info());
   CHECK_IMPLIES(has_original_bytecode_array(),
                 IsBytecodeArray(original_bytecode_array()));
   CHECK_IMPLIES(has_debug_bytecode_array(),

@@ -31,6 +31,15 @@ class LoopBuilder;
 class BlockCoverageBuilder;
 class BytecodeJumpTable;
 
+struct LogicalOrDecisionSourceRange {
+  int decision_start;
+  int decision_end;
+  int left_start;
+  int left_end;
+  int right_start;
+  int right_end;
+};
+
 struct PrototypeAssignments {
   Variable* var;
   HoleCheckMode hole_check_mode;
@@ -255,6 +264,7 @@ class BytecodeGenerator final : public AstVisitor<BytecodeGenerator> {
   void VisitArithmeticExpression(BinaryOperation* binop);
   void VisitCommaExpression(BinaryOperation* binop);
   void VisitLogicalOrExpression(BinaryOperation* binop);
+  void BuildIncrementLogicalOrCoverageCounter(int pattern_index);
   void VisitLogicalAndExpression(BinaryOperation* binop);
   void VisitNullishExpression(BinaryOperation* binop);
 
@@ -654,6 +664,7 @@ class BytecodeGenerator final : public AstVisitor<BytecodeGenerator> {
 
   TopLevelDeclarationsBuilder* top_level_builder_;
   BlockCoverageBuilder* block_coverage_builder_;
+  ZoneVector<LogicalOrDecisionSourceRange> logical_or_decisions_;
   ZoneVector<std::pair<FunctionLiteral*, size_t>> function_literals_;
   ZoneVector<std::pair<NativeFunctionLiteral*, size_t>>
       native_function_literals_;

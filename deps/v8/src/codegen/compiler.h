@@ -502,16 +502,19 @@ class FinalizeUnoptimizedCompilationData {
   FinalizeUnoptimizedCompilationData(Isolate* isolate,
                                      Handle<SharedFunctionInfo> function_handle,
                                      MaybeHandle<CoverageInfo> coverage_info,
+                                     MaybeHandle<ByteArray> logical_or_coverage_info,
                                      base::TimeDelta time_taken_to_execute,
                                      base::TimeDelta time_taken_to_finalize)
       : time_taken_to_execute_(time_taken_to_execute),
         time_taken_to_finalize_(time_taken_to_finalize),
         function_handle_(function_handle),
-        coverage_info_(coverage_info) {}
+        coverage_info_(coverage_info),
+        logical_or_coverage_info_(logical_or_coverage_info) {}
 
   FinalizeUnoptimizedCompilationData(LocalIsolate* isolate,
                                      Handle<SharedFunctionInfo> function_handle,
                                      MaybeHandle<CoverageInfo> coverage_info,
+                                     MaybeHandle<ByteArray> logical_or_coverage_info,
                                      base::TimeDelta time_taken_to_execute,
                                      base::TimeDelta time_taken_to_finalize);
 
@@ -521,6 +524,9 @@ class FinalizeUnoptimizedCompilationData {
 
   MaybeDirectHandle<CoverageInfo> coverage_info() const {
     return coverage_info_;
+  }
+  MaybeDirectHandle<ByteArray> logical_or_coverage_info() const {
+    return logical_or_coverage_info_;
   }
 
   base::TimeDelta time_taken_to_execute() const {
@@ -535,6 +541,7 @@ class FinalizeUnoptimizedCompilationData {
   base::TimeDelta time_taken_to_finalize_;
   Handle<SharedFunctionInfo> function_handle_;
   MaybeHandle<CoverageInfo> coverage_info_;
+  MaybeHandle<ByteArray> logical_or_coverage_info_;
 };
 
 using FinalizeUnoptimizedCompilationDataList =

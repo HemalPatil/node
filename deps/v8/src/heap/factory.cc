@@ -4572,6 +4572,8 @@ Handle<DebugInfo> Factory::NewDebugInfo(
   DCHECK_EQ(DebugInfo::kNoDebuggingId, debug_info->debugging_id());
   debug_info->set_break_points(*empty_fixed_array(), SKIP_WRITE_BARRIER);
   debug_info->set_coverage_info(*undefined_value(), SKIP_WRITE_BARRIER);
+  debug_info->set_logical_or_coverage_info(*undefined_value(),
+                                           SKIP_WRITE_BARRIER);
   debug_info->clear_original_bytecode_array();
   debug_info->clear_debug_bytecode_array();
 

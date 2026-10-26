@@ -654,6 +654,7 @@ void Debug::Unload() {
   ClearAllBreakPoints();
   ClearStepping();
   RemoveAllCoverageInfos();
+  RemoveAllLogicalOrCoverageInfos();
   ClearAllDebuggerHints();
   ClearScriptScopeInfos();
   debug_delegate_ = nullptr;

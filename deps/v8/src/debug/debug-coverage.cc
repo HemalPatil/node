@@ -4,6 +4,8 @@
 
 #include "src/debug/debug-coverage.h"
 
+#include <iostream>
+
 #include "src/ast/ast-source-ranges.h"
 #include "src/base/hashmap.h"
 #include "src/common/assert-scope.h"
@@ -12,6 +14,7 @@
 #include "src/deoptimizer/deoptimizer.h"
 #include "src/execution/frames-inl.h"
 #include "src/execution/isolate.h"
+#include "src/objects/debug-objects-inl.h"
 #include "src/objects/objects.h"
 
 #if V8_ENABLE_WEBASSEMBLY
@@ -803,6 +806,43 @@ std::unique_ptr<Coverage> Coverage::Collect(
         CollectBlockCoverage(isolate, &function, *info, collection_mode);
       }
 
+      if (IsBlockMode(collection_mode) &&
+          isolate->debug()->HasLogicalOrCoverageInfo(*info)) {
+        Tagged<ByteArray> logical_or_info = Cast<ByteArray>(
+            info->GetDebugInfo(isolate)->logical_or_coverage_info());
+        std::unique_ptr<char[]> function_name = function.name->ToCString();
+        const int decision_count =
+            LogicalOrCoverageInfo::decision_count(logical_or_info);
+        for (int decision = 0; decision < decision_count; ++decision) {
+          const int first_pattern =
+              decision * LogicalOrCoverageInfo::kPatternsPerDecision;
+          bool executed = false;
+          for (int row = 0; row < LogicalOrCoverageInfo::kPatternsPerDecision;
+               ++row) {
+            executed |= LogicalOrCoverageInfo::GetPattern(
+                            logical_or_info, first_pattern + row)
+                            .execution_count != 0;
+          }
+          if (!executed) continue;
+          for (int row = 0; row < LogicalOrCoverageInfo::kPatternsPerDecision;
+               ++row) {
+            LogicalOrEvaluationPattern pattern =
+                LogicalOrCoverageInfo::GetPattern(logical_or_info,
+                                                  first_pattern + row);
+            std::cout << "[DEBUG] mcdc: function=" << function_name.get()
+                      << " decision ["
+                      << pattern.decision_start_source_position << ", "
+                      << pattern.decision_end_source_position << ") row="
+                      << row << " evaluated_mask="
+                      << pattern.evaluated_condition_mask
+                      << " condition_values=" << pattern.condition_values
+                      << " decision_value=" << pattern.decision_value
+                      << " count=" << pattern.execution_count << std::endl;
+          }
+        }
+        LogicalOrCoverageInfo::ResetExecutionCounts(logical_or_info);
+      }
+
       // Only include a function range if itself or its parent function is
       // covered, or if it contains non-trivial block coverage.
       bool is_covered = (count != 0);
@@ -852,6 +892,7 @@ void Coverage::SelectMode(Isolate* isolate, debug::CoverageMode mode) {
       // following coverage recording (without reloads) will be at function
       // granularity.
       isolate->debug()->RemoveAllCoverageInfos();
+      isolate->debug()->RemoveAllLogicalOrCoverageInfos();
       isolate->SetFeedbackVectorsForProfilingTools(
           ReadOnlyRoots(isolate).undefined_value());
       break;

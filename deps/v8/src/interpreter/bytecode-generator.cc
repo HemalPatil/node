@@ -1451,6 +1451,7 @@ BytecodeGenerator::BytecodeGenerator(
       feedback_slot_cache_(zone()->New<FeedbackSlotCache>(zone())),
       top_level_builder_(zone()->New<TopLevelDeclarationsBuilder>()),
       block_coverage_builder_(nullptr),
+      logical_or_decisions_(zone()),
       function_literals_(0, zone()),
       native_function_literals_(0, zone()),
       object_literals_(0, zone()),
@@ -1534,6 +1535,19 @@ Handle<BytecodeArray> BytecodeGenerator::FinalizeBytecode(
       StdoutStream os;
       coverage_info->CoverageInfoPrint(os, info()->literal()->GetDebugName());
     }
+  }
+
+  if (!logical_or_decisions_.empty()) {
+    Handle<ByteArray> logical_or_info =
+        isolate->factory()->NewLogicalOrCoverageInfo(
+            static_cast<int>(logical_or_decisions_.size()));
+    for (int i = 0; i < static_cast<int>(logical_or_decisions_.size()); ++i) {
+      const LogicalOrDecisionSourceRange& range = logical_or_decisions_[i];
+      LogicalOrCoverageInfo::InitializeDecision(
+          *logical_or_info, i, range.decision_start, range.decision_end,
+          range.left_start, range.left_end, range.right_start, range.right_end);
+    }
+    info()->set_logical_or_coverage_info(logical_or_info);
   }
 
   if (HasStackOverflow()) return Handle<BytecodeArray>();
@@ -8519,6 +8533,75 @@ void BytecodeGenerator::VisitLogicalOrExpression(BinaryOperation* binop) {
   int right_coverage_slot =
       AllocateBlockCoverageSlotIfEnabled(binop, SourceRangeKind::kRight);
 
+  // Detailed block coverage temporarily activates logical OR collection.
+  AstNodeSourceRanges* source_ranges =
+      block_coverage_builder_ == nullptr
+          ? nullptr
+          : info()->source_range_map()->Find(binop);
+  if (source_ranges != nullptr &&
+      !source_ranges->GetRange(SourceRangeKind::kRight).IsEmpty()) {
+    SourceRange right_range = source_ranges->GetRange(SourceRangeKind::kRight);
+    const int decision_index = static_cast<int>(logical_or_decisions_.size());
+    logical_or_decisions_.push_back(
+        {left->position(), right_range.end, left->position(),
+         binop->position(), right_range.start, right_range.end});
+    const int first_pattern =
+        decision_index * LogicalOrCoverageInfo::kPatternsPerDecision;
+
+    if (execution_result()->IsTest()) {
+      TestResultScope* test_result = execution_result()->AsTest();
+      BytecodeLabels left_true(zone());
+      BytecodeLabels evaluate_right(zone());
+      BytecodeLabels right_true(zone());
+      BytecodeLabels right_false(zone());
+
+      VisitForTest(left, &left_true, &evaluate_right, TestFallthrough::kNone);
+      left_true.Bind(builder());
+      BuildIncrementLogicalOrCoverageCounter(first_pattern);
+      builder()->Jump(test_result->NewThenLabel());
+
+      evaluate_right.Bind(builder());
+      BuildIncrementBlockCoverageCounterIfEnabled(right_coverage_slot);
+      {
+        HoleCheckElisionScope elider(this);
+        VisitForTest(right, &right_true, &right_false,
+                     TestFallthrough::kNone);
+      }
+      right_true.Bind(builder());
+      BuildIncrementLogicalOrCoverageCounter(first_pattern + 2);
+      builder()->Jump(test_result->NewThenLabel());
+
+      right_false.Bind(builder());
+      BuildIncrementLogicalOrCoverageCounter(first_pattern + 1);
+      builder()->Jump(test_result->NewElseLabel());
+      test_result->SetResultConsumedByTest();
+    } else {
+      BytecodeLabels left_true(zone());
+      BytecodeLabels right_true(zone());
+      BytecodeLabels end(zone());
+
+      TypeHint left_hint = VisitForAccumulatorValue(left);
+      builder()->JumpIfTrue(ToBooleanModeFromTypeHint(left_hint),
+                            left_true.New());
+      BuildIncrementBlockCoverageCounterIfEnabled(right_coverage_slot);
+      TypeHint right_hint =
+          VisitInHoleCheckElisionScopeForAccumulatorValue(right);
+      builder()->JumpIfTrue(ToBooleanModeFromTypeHint(right_hint),
+                            right_true.New());
+      BuildIncrementLogicalOrCoverageCounter(first_pattern + 1);
+      builder()->Jump(end.New());
+
+      right_true.Bind(builder());
+      BuildIncrementLogicalOrCoverageCounter(first_pattern + 2);
+      builder()->Jump(end.New());
+
+      left_true.Bind(builder());
+      BuildIncrementLogicalOrCoverageCounter(first_pattern);
+      end.Bind(builder());
+    }
+    return;
+  }
+
   if (execution_result()->IsTest()) {
     TestResultScope* test_result = execution_result()->AsTest();
     if (left->ToBooleanIsTrue()) {
@@ -8552,6 +8635,20 @@ void BytecodeGenerator::VisitLogicalOrExpression(BinaryOperation* binop) {
     VisitInHoleCheckElisionScopeForAccumulatorValue(right);
     end_labels.Bind(builder());
   }
+}
+
+void BytecodeGenerator::BuildIncrementLogicalOrCoverageCounter(
+    int pattern_index) {
+  RegisterAllocationScope register_scope(this);
+  Register accumulator = register_allocator()->NewRegister();
+  RegisterList args = register_allocator()->NewRegisterList(2);
+  builder()
+      ->StoreAccumulatorInRegister(accumulator)
+      .MoveRegister(Register::function_closure(), args[0])
+      .LoadLiteral(Smi::FromInt(pattern_index))
+      .StoreAccumulatorInRegister(args[1])
+      .CallRuntime(Runtime::kIncLogicalOrCounter, args)
+      .LoadAccumulatorWithRegister(accumulator);
 }
 
 void BytecodeGenerator::VisitNaryLogicalOrExpression(NaryOperation* expr) {

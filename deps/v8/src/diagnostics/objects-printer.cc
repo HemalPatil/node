@@ -3705,6 +3705,7 @@ void DebugInfo::DebugInfoPrint(std::ostream& os) {
   os << "\n - break_points: " << Brief(break_points());
   os << "\n - flags: " << flags(kRelaxedLoad);
   os << "\n - coverage_info: " << Brief(coverage_info());
+  os << "\n - logical_or_coverage_info: " << Brief(logical_or_coverage_info());
   if (has_original_bytecode_array()) {
     os << "\n - original_bytecode_array: " << Brief(original_bytecode_array());
   }

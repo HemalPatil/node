@@ -8,10 +8,12 @@
 #include "src/debug/debug-coverage.h"
 #include "src/debug/debug-scopes.h"
 #include "src/debug/debug.h"
+#include "src/execution/arguments-inl.h"
 #include "src/execution/frames-inl.h"
 #include "src/execution/isolate-inl.h"
 #include "src/interpreter/bytecodes.h"
 #include "src/interpreter/interpreter.h"
+#include "src/objects/debug-objects-inl.h"
 #include "src/objects/js-array-buffer-inl.h"
 #include "src/objects/js-collection-inl.h"
 #include "src/objects/js-generator-inl.h"
@@ -948,6 +950,26 @@ RUNTIME_FUNCTION(Runtime_DebugToggleBlockCoverage) {
 
 RUNTIME_FUNCTION(Runtime_IncBlockCounter) {
   UNREACHABLE();  // Never called. See the IncBlockCounter builtin instead.
+}
+
+RUNTIME_FUNCTION(Runtime_IncLogicalOrCounter) {
+  SealHandleScope shs(isolate);
+  DCHECK_EQ(2, args.length());
+  DirectHandle<JSFunction> function = args.at<JSFunction>(0);
+  int pattern_index = args.smi_value_at(1);
+  std::optional<Tagged<DebugInfo>> debug_info =
+      isolate->debug()->TryGetDebugInfo(function->shared());
+  if (debug_info.has_value() &&
+      debug_info.value()->HasLogicalOrCoverageInfo()) {
+    Tagged<ByteArray> info =
+        Cast<ByteArray>(debug_info.value()->logical_or_coverage_info());
+    if (pattern_index >= 0 &&
+        pattern_index < LogicalOrCoverageInfo::decision_count(info) *
+                            LogicalOrCoverageInfo::kPatternsPerDecision) {
+      LogicalOrCoverageInfo::IncrementExecutionCount(info, pattern_index);
+    }
+  }
+  return ReadOnlyRoots(isolate).undefined_value();
 }
 
 RUNTIME_FUNCTION(Runtime_DebugAsyncFunctionSuspended) {
