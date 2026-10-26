@@ -8541,10 +8541,16 @@ void BytecodeGenerator::VisitLogicalOrExpression(BinaryOperation* binop) {
   if (source_ranges != nullptr &&
       !source_ranges->GetRange(SourceRangeKind::kRight).IsEmpty()) {
     SourceRange right_range = source_ranges->GetRange(SourceRangeKind::kRight);
+    auto* binary_ranges =
+        static_cast<BinaryOperationSourceRanges*>(source_ranges);
+    int left_start = binary_ranges->left_start();
+    int right_start = binary_ranges->right_start();
+    DCHECK_NE(left_start, kNoSourcePosition);
+    DCHECK_NE(right_start, kNoSourcePosition);
     const int decision_index = static_cast<int>(logical_or_decisions_.size());
     logical_or_decisions_.push_back(
-        {left->position(), right_range.end, left->position(),
-         binop->position(), right_range.start, right_range.end});
+        {left_start, right_range.end, left_start, binop->position(),
+         right_start, right_range.end});
     const int first_pattern =
         decision_index * LogicalOrCoverageInfo::kPatternsPerDecision;
 

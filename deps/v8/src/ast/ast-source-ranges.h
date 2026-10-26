@@ -80,8 +80,16 @@ class AstNodeSourceRanges : public ZoneObject {
 
 class BinaryOperationSourceRanges final : public AstNodeSourceRanges {
  public:
-  explicit BinaryOperationSourceRanges(const SourceRange& right_range)
-      : right_range_(right_range) {}
+  explicit BinaryOperationSourceRanges(
+      const SourceRange& right_range,
+      int32_t left_start = kNoSourcePosition,
+      int32_t right_start = kNoSourcePosition)
+      : right_range_(right_range),
+        left_start_(left_start),
+        right_start_(right_start) {}
+
+  int32_t left_start() const { return left_start_; }
+  int32_t right_start() const { return right_start_; }
 
   SourceRange GetRange(SourceRangeKind kind) override {
     DCHECK(HasRange(kind));
@@ -94,6 +102,8 @@ class BinaryOperationSourceRanges final : public AstNodeSourceRanges {
 
  private:
   SourceRange right_range_;
+  int32_t left_start_;
+  int32_t right_start_;
 };
 
 class ContinuationSourceRanges : public AstNodeSourceRanges {

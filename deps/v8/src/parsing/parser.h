@@ -998,11 +998,14 @@ class V8_EXPORT_PRIVATE Parser : public NON_EXPORTED_BASE(ParserBase<Parser>) {
   }
 
   V8_INLINE void RecordBinaryOperationSourceRange(
-      Expression* node, const SourceRange& right_range) {
+      Expression* node, const SourceRange& right_range,
+      int32_t left_start = kNoSourcePosition,
+      int32_t right_start = kNoSourcePosition) {
     if (source_range_map_ == nullptr) return;
     source_range_map_->Insert(
         node->AsBinaryOperation(),
-        zone()->New<BinaryOperationSourceRanges>(right_range));
+        zone()->New<BinaryOperationSourceRanges>(right_range, left_start,
+                                                right_start));
   }
 
   V8_INLINE void RecordJumpStatementSourceRange(Statement* node,

@@ -1401,7 +1401,8 @@ class ParserBase {
   ExpressionT ParseConditionalContinuation(ExpressionT expression, int pos);
   ExpressionT ParseLogicalExpression();
   ExpressionT ParseCoalesceExpression(ExpressionT expression);
-  ExpressionT ParseBinaryContinuation(ExpressionT x, int prec, int prec1);
+  ExpressionT ParseBinaryContinuation(ExpressionT x, int prec, int prec1,
+                                      int left_start);
   V8_INLINE ExpressionT ParseBinaryExpression(int prec);
   ExpressionT ParseUnaryOrPrefixExpression();
   ExpressionT ParseAwaitExpression();
@@ -3513,11 +3514,12 @@ ParserBase<Impl>::ParseLogicalExpression() {
 
   // Both LogicalORExpression and CoalesceExpression start with BitwiseOR.
   // Parse for binary expressions >= 6 (BitwiseOR);
+  int left_start = peek_position();
   ExpressionT expression = ParseBinaryExpression(6);
   if (peek() == Token::kAnd || peek() == Token::kOr) {
     // LogicalORExpression, pickup parsing where we left off.
     int prec1 = Token::Precedence(peek(), accept_IN_);
-    expression = ParseBinaryContinuation(expression, 4, prec1);
+    expression = ParseBinaryContinuation(expression, 4, prec1, left_start);
   } else if (V8_UNLIKELY(peek() == Token::kNullish)) {
     expression = ParseCoalesceExpression(expression);
   }
@@ -3673,17 +3675,20 @@ ParserBase<Impl>::ParseConditionalContinuation(ExpressionT expression,
 // Precedence >= 4
 template <typename Impl>
 typename ParserBase<Impl>::ExpressionT
-ParserBase<Impl>::ParseBinaryContinuation(ExpressionT x, int prec, int prec1) {
+ParserBase<Impl>::ParseBinaryContinuation(ExpressionT x, int prec, int prec1,
+                                          int left_start) {
   do {
     // prec1 >= 4
     while (Token::Precedence(peek(), accept_IN_) == prec1) {
       SourceRange right_range;
       int pos = peek_position();
+      int right_start;
       ExpressionT y;
       Token::Value op;
       {
         SourceRangeScope right_range_scope(scanner(), &right_range);
         op = Next();
+        right_start = peek_position();
 
         const bool is_right_associative = op == Token::kExp;
         const int next_prec = is_right_associative ? prec1 : prec1 + 1;
@@ -3715,7 +3720,8 @@ ParserBase<Impl>::ParseBinaryContinuation(ExpressionT x, int prec, int prec1) {
         // We have a "normal" binary operation.
         x = factory()->NewBinaryOperation(op, x, y, pos);
         if (op == Token::kOr || op == Token::kAnd) {
-          impl()->RecordBinaryOperationSourceRange(x, right_range);
+          impl()->RecordBinaryOperationSourceRange(x, right_range, left_start,
+                                                   right_start);
         }
       }
     }
@@ -3730,6 +3736,7 @@ template <typename Impl>
 typename ParserBase<Impl>::ExpressionT ParserBase<Impl>::ParseBinaryExpression(
     int prec) {
   DCHECK_GE(prec, 4);
+  int left_start = peek_position();
 
   // "#foo in ShiftExpression" needs to be parsed separately, since private
   // identifiers are not valid PrimaryExpressions.
@@ -3740,13 +3747,13 @@ typename ParserBase<Impl>::ExpressionT ParserBase<Impl>::ParseBinaryExpression(
       ReportUnexpectedToken(Token::kPrivateName);
       return impl()->FailureExpression();
     }
-    return ParseBinaryContinuation(x, prec, prec1);
+    return ParseBinaryContinuation(x, prec, prec1, left_start);
   }
 
   ExpressionT x = ParseUnaryExpression();
   int prec1 = Token::Precedence(peek(), accept_IN_);
   if (prec1 >= prec) {
-    return ParseBinaryContinuation(x, prec, prec1);
+    return ParseBinaryContinuation(x, prec, prec1, left_start);
   }
   return x;
 }
